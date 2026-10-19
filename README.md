@@ -64,3 +64,32 @@ npm run dev:backend
 # Terminal 2: Start Vite Frontend Dev Server (http://localhost:5173)
 npm run dev:frontend
 ```
+
+---
+
+## Docker Setup
+
+### Option 1: Docker Compose (Recommended)
+Run the containerized application with a single command:
+```bash
+docker compose up -d --build
+```
+- Access the suite at: **`http://localhost:3000`**
+- View logs: `docker compose logs -f`
+- Stop the container: `docker compose down`
+
+### Option 2: Docker CLI
+Build and run the container manually:
+```bash
+# Build the production image
+docker build -t devsecops-utilities .
+
+# Run the container (detached mode on port 3000)
+docker run -d --name devsecops-utilities -p 3000:3000 devsecops-utilities
+
+# View container logs
+docker logs -f devsecops-utilities
+
+# Stop and remove container
+docker stop devsecops-utilities && docker rm devsecops-utilities
+```

@@ -1,0 +1,39 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies
+node_modules
+*/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build artifacts & caches
+dist
+*/dist
+dist-ssr
+build
+out
+.vite
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Test & exported files
+*.xlsx
+*.csv
+temp
+tmp
+uploads
+
+# Editor and OS files
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+[Dd]esktop.ini
