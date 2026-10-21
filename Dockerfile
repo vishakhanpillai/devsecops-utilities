@@ -1,26 +1,26 @@
 # syntax=docker/dockerfile:1
 
 # ==========================================
-# Stage 1: Build Frontend
+# Stage 1: Build Frontend & Backend
 # ==========================================
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy root and workspace package files for layer caching
+# Copy workspace package manifests for layer caching
 COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
 
-# Install all dependencies (including devDependencies required for Vite & Tailwind build)
+# Install build dependencies
 RUN npm ci
 
-# Copy source files
+# Copy source trees
 COPY frontend/ ./frontend/
 COPY backend/ ./backend/
 
-# Compile frontend static bundle (outputs to /app/frontend/dist)
-RUN npm run build:frontend
+# Build both frontend and backend bundles
+RUN npm run build
 
 # ==========================================
 # Stage 2: Production Runtime
@@ -32,23 +32,16 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copy root and workspace package files
-COPY package.json package-lock.json ./
-COPY frontend/package.json ./frontend/
-COPY backend/package.json ./backend/
+# Copy backend package manifest to install only production dependencies
+COPY --chown=node:node backend/package.json ./package.json
 
-# Install production dependencies only
-RUN npm ci --omit=dev
+# Install backend production dependencies only and purge npm cache
+RUN npm install --omit=dev --no-audit --no-fund \
+    && npm cache clean --force
 
-# Copy compiled frontend distribution from builder
-COPY --from=builder /app/frontend/dist ./frontend/dist
-
-# Copy backend source code and config
-COPY backend/src ./backend/src
-COPY backend/tsconfig.json ./backend/
-
-# Ensure non-root node user owns application directory
-RUN chown -R node:node /app
+# Copy compiled distribution assets with non-root ownership
+COPY --from=builder --chown=node:node /app/frontend/dist ./frontend/dist
+COPY --from=builder --chown=node:node /app/backend/dist/index.js ./backend/dist/index.js
 
 # Security: Run as non-root user
 USER node
@@ -59,5 +52,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/api/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-# Start the unified backend server on port 3000
-CMD ["npm", "start"]
+# Start the compiled backend server
+CMD ["node", "backend/dist/index.js"]

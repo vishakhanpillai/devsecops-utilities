@@ -1,95 +1,56 @@
-# DevSecOps Utilities Suite
+# DevSecOps Utilities
 
-Unified enterprise TypeScript & React suite combining:
-1. **SonarQube Excel Exporter** — Connects to SonarQube / SonarCloud, categorizes issues across Security, Reliability, and Maintainability, and exports formatted multi-sheet `.xlsx` reports with clickable issue links and remediation guidance.
-2. **Subdomain MasterSheet** — Parses BIND/GoDaddy/Route53/CSV zone files, streams concurrent DNS & HTTP/HTTPS host probes over Server-Sent Events (SSE), supports inline & batch IP descriptors, and exports styled `.xlsx` and `.csv` master sheets.
+A lightweight suite combining **SonarQube Excel Exporter** and **Subdomain MasterSheet** for security analysis and infrastructure reconnaissance.
 
----
+## Features
 
-## Project Structure
+- **SonarQube Exporter**: Connects to SonarQube/SonarCloud APIs, categorizes issues (Security, Reliability, Maintainability), and exports styled multi-tab `.xlsx` reports with direct issue links.
+- **Subdomain MasterSheet**: Parses DNS zone files (BIND, Route53, GoDaddy, CSV), streams real-time DNS & HTTP(S) probes via Server-Sent Events (SSE), and exports `.xlsx`/`.csv` asset sheets.
 
-```text
-DevSecOps Utilities/
-├── frontend/                   # React 18 + TypeScript + Vite + Tailwind CSS
-│   ├── index.html
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   └── src/
-│       ├── main.tsx
-│       ├── App.tsx
-│       ├── index.css
-│       ├── components/
-│       │   ├── common/         # Header, AlertBanner
-│       │   ├── sonar/          # ConnectionForm, ProjectCard, MetricsOverview, IssueFilters, IssueTable, ExportModal
-│       │   └── subdomain/      # SubdomainScanner, ImportDrawer, SubdomainFilterBar, SubdomainTable, BatchDescriptorModal
-│       ├── services/
-│       │   ├── sonar/          # sonarApi, sonarExcelExporter, sonarKnowledge
-│       │   └── subdomain/      # subdomainApi
-│       └── types/              # sonar.ts, subdomain.ts
-│
-├── backend/                    # Express + TypeScript API & Static Server
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── src/
-│       ├── index.ts            # Express server entry point
-│       ├── routes/             # sonar.routes.ts, subdomain.routes.ts
-│       ├── services/           # dnsParser.ts, hostChecker.ts, subdomainExporter.ts
-│       └── types/              # subdomain.types.ts
-│
-└── package.json                # Root workspace scripts
-```
+## Tech Stack
 
----
+- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons
+- **Backend**: Node.js 20, Express, TypeScript, ExcelJS, Multer
 
 ## Quick Start
 
-### 1. Build Both Frontend & Backend
-```bash
-npm run build
-```
+### Local Development
 
-### 2. Start Production Server (Port 3000)
 ```bash
-npm start
-```
-Open **`http://localhost:3000`** in your browser.
+# Install dependencies
+npm install
 
-### 3. Development Mode (Separate Frontend & Backend)
-```bash
-# Terminal 1: Start Backend API (http://localhost:3000)
+# Terminal 1: Backend API (http://localhost:3000)
 npm run dev:backend
 
-# Terminal 2: Start Vite Frontend Dev Server (http://localhost:5173)
+# Terminal 2: Frontend Dev Server (http://localhost:5173)
 npm run dev:frontend
 ```
 
----
+### Production Run
 
-## Docker Setup
+```bash
+npm run build
+npm start
+```
+Access at **`http://localhost:3000`**.
 
-### Option 1: Docker Compose (Recommended)
-Run the containerized application with a single command:
+## Docker
+
+### Using Docker Compose
 ```bash
 docker compose up -d --build
 ```
-- Access the suite at: **`http://localhost:3000`**
-- View logs: `docker compose logs -f`
-- Stop the container: `docker compose down`
 
-### Option 2: Docker CLI
-Build and run the container manually:
+### Using Docker CLI
 ```bash
-# Build the production image
 docker build -t devsecops-utilities .
-
-# Run the container (detached mode on port 3000)
-docker run -d --name devsecops-utilities -p 3000:3000 devsecops-utilities
-
-# View container logs
-docker logs -f devsecops-utilities
-
-# Stop and remove container
-docker stop devsecops-utilities && docker rm devsecops-utilities
+docker run -d -p 3000:3000 --name devsecops-utilities devsecops-utilities
 ```
+
+## Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3000` | HTTP port for the application |
+| `NODE_ENV` | `production` | Node environment (`development` / `production`) |

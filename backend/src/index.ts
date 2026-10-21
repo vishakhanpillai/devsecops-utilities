@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import type { Server } from 'http';
 import { sonarRouter } from './routes/sonar.routes';
@@ -33,25 +34,35 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', sonarRouter);
 app.use('/api', subdomainRouter);
 
-// Serve static frontend build from ../../frontend/dist with no-cache headers
-const staticDistPath = path.resolve(__dirname, '../../frontend/dist');
-app.use(
-  express.static(staticDistPath, {
-    etag: false,
-    maxAge: 0,
-    setHeaders: (res) => {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    },
-  })
-);
+// Determine static frontend build path (supports Docker, direct run, or configured path)
+const defaultDist = path.resolve(__dirname, '../../frontend/dist');
+const altDist = path.resolve(__dirname, '../frontend/dist');
+const staticDistPath = process.env.STATIC_DIST_PATH || 
+  (fs.existsSync(defaultDist) ? defaultDist : altDist);
 
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    return next();
-  }
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.sendFile(path.join(staticDistPath, 'index.html'));
-});
+if (fs.existsSync(staticDistPath)) {
+  app.use(
+    express.static(staticDistPath, {
+      etag: false,
+      maxAge: 0,
+      setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      },
+    })
+  );
+
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    const indexPath = path.join(staticDistPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      return res.sendFile(indexPath);
+    }
+    next();
+  });
+}
 
 // Start server with automatic port retry if port is occupied
 function startServer(port: number, maxRetries = 10): void {
