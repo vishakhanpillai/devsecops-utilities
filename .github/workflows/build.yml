@@ -82,12 +82,12 @@ jobs:
           echo "Report filename: ${REPORT_NAME}"
 
       - name: Run Trivy Filesystem Scan (Full Built Tree)
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
           format: 'json'
-          output: '${{env.REPORT_NAME }}.json'
+          output: '${{ env.REPORT_NAME }}.json'
           exit-code: '0'
 
       - name: Convert Trivy JSON to CSV using jq
