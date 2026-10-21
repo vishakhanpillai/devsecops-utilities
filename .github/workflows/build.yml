@@ -10,21 +10,21 @@ on:
   workflow_dispatch:
 
 jobs:
+  # JOB 1: BUILD & TEST
   build:
+    name: Build and Test Application
     runs-on: ubuntu-latest
+
     steps:
-      #1. Grab the code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      #2. Setup Node.js 20
-      - name: Setup Node.js
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
-      # 3. Install and Build
       - name: Install dependencies
         run: npm ci
 
@@ -34,14 +34,104 @@ jobs:
       - name: Build frontend and backend
         run: npm run build
 
-      # 4. Save and publish the production artifact
-      - name: Upload build artifact
+      - name: Save compiled dist files
         uses: actions/upload-artifact@v4
         with:
-          name: devsecops-utilities-build
+          name: compiled-app-dist
           path: |
               backend/dist
               frontend/dist
               backend/package.json
               package.json
-              packege-lock.json
+              package-lock.json
+
+  # JOB 2: SECURITY SCAN
+  security-scan:
+    name: Trivy SCA & CSV Export
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          name: built-workspace
+          path: .
+
+      - name: Download built workspace
+        uses: actions/download-artifact@v4
+        with:
+          name: built-workspace
+          path: .
+
+      - name: Setup Node.js & Install Dependencies for Full Tree Scan
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Restore Dependencies
+        run: npm ci
+
+      - name: Generate Dynamic Report Filename
+        run: |
+          PROJECT_NAME="${{ github.event.repository.name }}"
+          DATE=$(date +'%Y-%m-%d')
+          REPORT_NAME="${PROJECT_NAME}-sca-${DATE}"
+          echo "REPORT_NAME=${REPORT_NAME}" >> $GITHUB_ENV
+          echo "Report filename: ${REPORT_NAME}"
+
+      - name: Run Trivy Filesystem Scan (Full Built Tree)
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'json'
+          output: '${{env.REPORT_NAME }}.json'
+          exit-code: '0'
+
+      - name: Convert Trivy JSON to CSV using jq
+        run: |
+            jq -r '
+            ["Target", "Package", "VulnerabilityID", "Severity", "InstalledVersion",
+             "FixedVersion", "Title"],
+                           (.Results[]? | .Target as $target | .Vulnerabilities[]? |
+                             [$target, .PkgName, .VulnerabilityID, .Severity, .InstalledVersion, (.
+             FixedVersion // "N/A"), (.Title // "N/A")]
+                           ) | @csv
+                         ' "${{ env.REPORT_NAME }}.json" > "${{ env.REPORT_NAME }}.csv"
+            echo "Preview of CSV scan Results:"
+            head -n 15 "${{ env.REPORT_NAME }}.csv"
+
+      - name: Upload Security Report Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.REPORT_NAME }}.json
+          path: |
+              ${{ env.REPORT_NAME }}.json
+              ${{ env.REPORT_NAME }}.csv
+
+  # JOB 3: PACKAGE ARTIFACT
+  package-artifact:
+    name: 3. Package Production Artifact
+    runs-on: ubuntu-latest
+    needs: security-scan
+
+    steps:
+      - name: Download built workspace
+        uses: actions/download-artifact@v4
+        with:
+          name: built-workspace
+          path: app
+
+      - name: ZIP Production Release
+        run: |
+            cd app
+            zip -r ../devsecops-utilites-production.zip .
+            ls -lh devsecops-utilities-production.zip
+
+      - name: Upload Official Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: devsecops-utilities-production-release
+          path: devsecops-utilities-production.zip
