@@ -37,7 +37,7 @@ jobs:
       - name: Save compiled dist files
         uses: actions/upload-artifact@v4
         with:
-          name: compiled-app-dist
+          name: built-workspace
           path: |
               backend/dist
               frontend/dist
