@@ -127,8 +127,8 @@ jobs:
       - name: ZIP Production Release
         run: |
             cd app
-            zip -r ../devsecops-utilites-production.zip .
-            ls -lh devsecops-utilities-production.zip
+            zip -r ../devsecops-utilities-production.zip .
+            ls -lh ../devsecops-utilities-production.zip
 
       - name: Upload Official Release Artifact
         uses: actions/upload-artifact@v4
