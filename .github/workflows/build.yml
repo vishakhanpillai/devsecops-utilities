@@ -1,0 +1,47 @@
+name: Build and Package
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      #1. Grab the code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      #2. Setup Node.js 20
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # 3. Install and Build
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run typechecks
+        run: npm run test
+
+      - name: Build frontend and backend
+        run: npm run build
+
+      # 4. Save and publish the production artifact
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: devsecops-utilities-build
+          path: |
+              backend/dist
+              frontend/dist
+              backend/package.json
+              package.json
+              packege-lock.json
