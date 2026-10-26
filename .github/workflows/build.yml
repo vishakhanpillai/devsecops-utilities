@@ -58,12 +58,6 @@ jobs:
           name: built-workspace
           path: .
 
-      - name: Download built workspace
-        uses: actions/download-artifact@v4
-        with:
-          name: built-workspace
-          path: .
-
       - name: Setup Node.js & Install Dependencies for Full Tree Scan
         uses: actions/setup-node@v4
         with:
