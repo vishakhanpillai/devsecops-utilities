@@ -79,7 +79,7 @@ jobs:
           DT_API_KEY: ${{secrets.DEPENDENCY_TRACK_API_KEY}}
           DT_SERVER: ${{secrets.DEPENDENCY_TRACK_URL}}
         run: |
-            curl --show-error --silent -fail-with-body \
+            curl --show-error --silent --fail-with-body \
             -X POST "$DT_SERVER/api/api/v1/bom" \
             -H "X-Api-Key: $DT_API_KEY" \
             -H "Content-Type: multipart/form-data" \
