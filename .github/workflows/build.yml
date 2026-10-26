@@ -73,6 +73,32 @@ jobs:
       - name: Restore Dependencies
         run: npm ci
 
+      - name: Generate SBOM
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: 'fs'
+          format: 'cyclonedx'
+          output: 'sbom.json'
+          exit-code: '0'
+
+      - name: Upload SBOM to OWASP Dependency Track
+        uses: DependencyTrack/gh-upload-sbom@v4.2.0
+        with:
+          server-hostname: ${{secrets.DEPENDENCY_TRACK_URL }}
+          api-key: ${{secrets.DEPENDENCY_TRACK_API_KEY}}
+          project-name: 'DevSecOpsUtilities'
+          project-version: '1.0'
+          bom-filename: 'sbom.json'
+          auto-create: true
+
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Generate Dynamic Report Filename
         run: |
           PROJECT_NAME="${{ github.event.repository.name }}"
