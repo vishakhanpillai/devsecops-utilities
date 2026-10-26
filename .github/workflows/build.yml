@@ -80,7 +80,7 @@ jobs:
           DT_SERVER: ${{secrets.DEPENDENCY_TRACK_URL}}
         run: |
             curl --show-error --silent --fail-with-body \
-            -X POST "$DT_SERVER/api/api/v1/bom" \
+            -X POST "${DT_SERVER%/}" \
             -H "X-Api-Key: $DT_API_KEY" \
             -H "Content-Type: multipart/form-data" \
             -F "projectName=DevSecOpsUtilities" \
