@@ -1,16 +1,13 @@
-name: Build and Package
+name: DevSecOps Utilities Pipeline
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
-  # JOB 1: BUILD & TEST
+  # JOB1: Build
   build:
     name: Build and Test Application
     runs-on: ubuntu-latest
@@ -28,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run typechecks
+      - name: Install typechecks
         run: npm run test
 
       - name: Build frontend and backend
@@ -45,9 +42,9 @@ jobs:
               package.json
               package-lock.json
 
-  # JOB 2: SECURITY SCAN
+  # JOB 2: Security Scan
   security-scan:
-    name: Trivy SCA & CSV Export
+    name: Trivy SCA
     runs-on: ubuntu-latest
     needs: build
 
@@ -55,10 +52,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          name: built-workspace
+          name: build-workspace
           path: .
 
-      - name: Setup Node.js & Install Dependencies for Full Tree Scan
+      - name: Setup Node.js and Install Dependencies for Full tree scan
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -67,32 +64,44 @@ jobs:
       - name: Restore Dependencies
         run: npm ci
 
-      - name: Generates BoM and upload to OWASP DTrack
-        id: riskscoreFromDT
-        uses: Quobis/action-owasp-dependecy-track-check@main
+
+      - name: Generate SBOM
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
-          url: '${{secrets.DEPENDENCY_TRACK_URL }}'
-          key: '${{secrets.DEPENDENCY_TRACK_API_KEY}}'
-          language: 'nodejs'
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'cyclonedx'
+          output: 'sbom.json'
+          exit-code: '0'
 
-      - name: Get the output time
-        run: echo "The risk score of the project is ${{ steps.riskscoreFromDT.outputs.riskscore }}"
-
-      - name: Generate Dynamic Report Filename
+      - name: Upload to OWASP Dependency Track
+        env:
+          DT_API_KEY: ${{secrets.DEPENDENCY_TRACK_API_KEY}}
+          DT_SERVER: ${{secrets.DEPENDENCY_TRACK_URL}}
         run: |
-          PROJECT_NAME="${{ github.event.repository.name }}"
-          DATE=$(date +'%Y-%m-%d')
-          REPORT_NAME="${PROJECT_NAME}-sca-${DATE}"
-          echo "REPORT_NAME=${REPORT_NAME}" >> $GITHUB_ENV
-          echo "Report filename: ${REPORT_NAME}"
+            curl --show-error --silent -fail-with-body \
+            -X POST "$DT_SERVER/api/api/v1/bom" \
+            -H "X-Api-Key: $DT_API_KEY" \
+            -H "Content-Type: multipart/form-data" \
+            -F "projectName=DevSecOpsUtilities" \
+            -F "projectVersion=1.0.0" \
+            -F "autoCreate=true" \
+            -F "bom=@sbom.json"
+            
 
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          
       - name: Run Trivy Filesystem Scan (Full Built Tree)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
           format: 'json'
-          output: '${{env.REPORT_NAME }}.json'
+          output: 'sca.json'
           exit-code: '0'
 
       - name: Convert Trivy JSON to CSV using jq
@@ -104,39 +113,15 @@ jobs:
                              [$target, .PkgName, .VulnerabilityID, .Severity, .InstalledVersion, (.
              FixedVersion // "N/A"), (.Title // "N/A")]
                            ) | @csv
-                         ' "${{ env.REPORT_NAME }}.json" > "${{ env.REPORT_NAME }}.csv"
+                         ' "sca.json" > "sca.csv"
             echo "Preview of CSV scan Results:"
-            head -n 15 "${{ env.REPORT_NAME }}.csv"
+            head -n 15 "sca.csv"
 
       - name: Upload Security Report Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.REPORT_NAME }}.json
+          name: sca.json
           path: |
-              ${{ env.REPORT_NAME }}.json
-              ${{ env.REPORT_NAME }}.csv
-
-  # JOB 3: PACKAGE ARTIFACT
-  package-artifact:
-    name: 3. Package Production Artifact
-    runs-on: ubuntu-latest
-    needs: security-scan
-
-    steps:
-      - name: Download built workspace
-        uses: actions/download-artifact@v4
-        with:
-          name: built-workspace
-          path: app
-
-      - name: ZIP Production Release
-        run: |
-            cd app
-            zip -r ../devsecops-utilites-production.zip .
-            ls -lh devsecops-utilities-production.zip
-
-      - name: Upload Official Release Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: devsecops-utilities-production-release
-          path: devsecops-utilities-production.zip
+              sca.json
+              sca.csv
+        
