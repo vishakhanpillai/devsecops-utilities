@@ -23,3 +23,17 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  # Permanent Cloudflare Tunnel (Requires custom domain & TUNNEL_TOKEN in .env)
+  # Run with tunnel: docker compose --profile tunnel up -d
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: devsecops-tunnel
+    restart: unless-stopped
+    profiles:
+      - tunnel
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    depends_on:
+      - devsecops-suite

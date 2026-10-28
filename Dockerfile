@@ -1,30 +1,26 @@
-# syntax=docker/dockerfile:1
-
-# ==========================================
-# Stage 1: Build Frontend & Backend
-# ==========================================
+# Stage 1: Build Frontend (Vite) & Backend Bundle (esbuild)
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy workspace package manifests for layer caching
+# Copy root and workspace package manifests for optimal layer caching
 COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
 
-# Install build dependencies
+# Install all dependencies (TypeScript, Vite, Tailwind, esbuild, etc.)
 RUN npm ci
 
-# Copy source trees
+# Copy full source trees
 COPY frontend/ ./frontend/
 COPY backend/ ./backend/
 
-# Build both frontend and backend bundles
+# Build both frontend (frontend/dist) and backend bundle (backend/dist/index.js)
 RUN npm run build
 
-# ==========================================
-# Stage 2: Production Runtime
-# ==========================================
+# Stage 2: Ultra-Lean Production Runtime (~70 MB)
+# Contains ONLY compiled assets and minimal runtime dependencies
+
 FROM node:20-alpine AS runner
 
 WORKDIR /app
@@ -32,25 +28,28 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copy backend package manifest to install only production dependencies
+# Copy only the backend's package manifest to isolate runtime dependencies
+# This excludes dev tools (TypeScript, Vite, Tailwind, Rollup, PostCSS, tsx)
 COPY --chown=node:node backend/package.json ./package.json
 
-# Install backend production dependencies only and purge npm cache
-RUN npm install --omit=dev --no-audit --no-fund \
+# Install strictly production dependencies (express, cors, multer, exceljs) and clear npm cache
+RUN npm install --omit=dev --no-audit --no-fund --ignore-scripts \
     && npm cache clean --force
 
-# Copy compiled distribution assets with non-root ownership
-COPY --from=builder --chown=node:node /app/frontend/dist ./frontend/dist
-COPY --from=builder --chown=node:node /app/backend/dist/index.js ./backend/dist/index.js
+# Copy ONLY the compiled artifacts from the builder stage:
+# - Frontend static build -> /app/public
+# - Backend bundled executable -> /app/server.js
+COPY --from=builder --chown=node:node /app/frontend/dist ./public
+COPY --from=builder --chown=node:node /app/backend/dist/index.js ./server.js
 
-# Security: Run as non-root user
+# DevSecOps best practice: execute as non-privileged user
 USER node
 
 EXPOSE 3000
 
-# Container health check using Node 20 native fetch
+# Built-in lightweight health check using Node 20's native fetch
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/api/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-# Start the compiled backend server
-CMD ["node", "backend/dist/index.js"]
+# Direct execution with Node (fast startup, proper PID 1 signal handling)
+CMD ["node", "server.js"]

@@ -34,11 +34,18 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', sonarRouter);
 app.use('/api', subdomainRouter);
 
-// Determine static frontend build path (supports Docker, direct run, or configured path)
-const defaultDist = path.resolve(__dirname, '../../frontend/dist');
-const altDist = path.resolve(__dirname, '../frontend/dist');
-const staticDistPath = process.env.STATIC_DIST_PATH || 
-  (fs.existsSync(defaultDist) ? defaultDist : altDist);
+// Determine static frontend build path (supports Docker public folder, local dev, or configured path)
+const candidateDistPaths = [
+  process.env.STATIC_DIST_PATH,
+  path.resolve(__dirname, 'public'),
+  path.resolve(__dirname, '../public'),
+  path.resolve(__dirname, '../../frontend/dist'),
+  path.resolve(__dirname, '../frontend/dist'),
+  path.resolve(process.cwd(), 'public'),
+  path.resolve(process.cwd(), 'frontend/dist'),
+].filter(Boolean) as string[];
+
+const staticDistPath = candidateDistPaths.find((p) => fs.existsSync(p)) || path.resolve(__dirname, '../../frontend/dist');
 
 if (fs.existsSync(staticDistPath)) {
   app.use(
