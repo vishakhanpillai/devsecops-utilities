@@ -80,7 +80,7 @@ jobs:
           DT_SERVER: ${{secrets.DEPENDENCY_TRACK_URL}}
         run: |
             curl --show-error --silent --fail-with-body \
-            -X POST "$DT_SERVER/api/api/v1/bom" \
+            -X POST "${DT_SERVER%/}" \
             -H "X-Api-Key: $DT_API_KEY" \
             -H "Content-Type: multipart/form-data" \
             -F "projectName=DevSecOpsUtilities" \
@@ -106,22 +106,30 @@ jobs:
 
       - name: Convert Trivy JSON to CSV using jq
         run: |
-            jq -r '
-            ["Target", "Package", "VulnerabilityID", "Severity", "InstalledVersion",
-             "FixedVersion", "Title"],
-                           (.Results[]? | .Target as $target | .Vulnerabilities[]? |
-                             [$target, .PkgName, .VulnerabilityID, .Severity, .InstalledVersion, (.
-             FixedVersion // "N/A"), (.Title // "N/A")]
-                           ) | @csv
-                         ' "sca.json" > "sca.csv"
-            echo "Preview of CSV scan Results:"
-            head -n 15 "sca.csv"
+          set -euo pipefail
+
+          jq -r '
+            ["Target", "Package", "VulnerabilityID", "Severity",
+             "InstalledVersion", "FixedVersion", "Title"],
+            (.Results[]? |
+              .Target as $target |
+              .Vulnerabilities[]? |
+              [$target, .PkgName, .VulnerabilityID, .Severity,
+               .InstalledVersion, (.FixedVersion // "N/A"),
+               (.Title // "N/A")]
+            ) | @csv
+          ' sca.json > sca.csv
+
+          echo "Preview of CSV scan results:"
+          head -n 15 sca.csv
 
       - name: Upload Security Report Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sca.json
+          name: sca-report
           path: |
               sca.json
               sca.csv
+          if-no-files-found: error
+          
         
