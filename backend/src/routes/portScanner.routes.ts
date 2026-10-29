@@ -75,6 +75,12 @@ portScannerRouter.post('/stream', async (req: Request, res: Response) => {
     cancelled = true;
   });
 
+  // Automatically cancel scanning and free resources if client closes connection/tab
+  res.on('close', () => {
+    cancelled = true;
+    activePortScans.delete(scanId);
+  });
+
   const sendEvent = (event: string, data: any) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
