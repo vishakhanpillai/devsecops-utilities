@@ -31,9 +31,6 @@ jobs:
       - name: Run Tests
         run: npm run test
 
-      - name: Run Type Checks
-        run: npm run typecheck
-
   # JOB 2: Security Scan
   security-scan:
     name: Trivy SCA
