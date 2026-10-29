@@ -1,11 +1,13 @@
 # DevSecOps Utilities
 
-A lightweight suite combining **SonarQube Excel Exporter** and **Subdomain MasterSheet** for security analysis and infrastructure reconnaissance.
+A lightweight suite combining **SonarQube Excel Exporter**, **Subdomain MasterSheet**, **SBOM License Resolver**, and **Port & Service Scanner** for security analysis, infrastructure reconnaissance, and compliance.
 
 ## Features
 
 - **SonarQube Exporter**: Connects to SonarQube/SonarCloud APIs, categorizes issues (Security, Reliability, Maintainability), and exports styled multi-tab `.xlsx` reports with direct issue links.
 - **Subdomain MasterSheet**: Parses DNS zone files (BIND, Route53, GoDaddy, CSV), streams real-time DNS & HTTP(S) probes via Server-Sent Events (SSE), and exports `.xlsx`/`.csv` asset sheets.
+- **SBOM License Resolver**: Automatically resolves legacy `"Unknown - See URL"` licenses in CycloneDX and SPDX SBOMs into standardized SPDX identifiers with Excel audit reports.
+- **Port & Service Scanner**: Hybrid port scanner utilizing real **Nmap** (with service version detection `-sV`) when available, and high-speed native **Node.js TCP Sockets** with real-time SSE streaming.
 
 ## Tech Stack
 

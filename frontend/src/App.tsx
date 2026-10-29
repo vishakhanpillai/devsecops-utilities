@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Header, ActiveTool } from './components/common/Header';
+import { Sidebar, ActiveTool } from './components/common/Sidebar';
+import { Header } from './components/common/Header';
 import { AlertBanner, AlertMessage } from './components/common/AlertBanner';
 import { ConnectionForm } from './components/sonar/ConnectionForm';
 import { ProjectCard } from './components/sonar/ProjectCard';
@@ -8,6 +9,8 @@ import { IssueFilters } from './components/sonar/IssueFilters';
 import { IssueTable } from './components/sonar/IssueTable';
 import { ExportModal } from './components/sonar/ExportModal';
 import { SubdomainScanner } from './components/subdomain/SubdomainScanner';
+import { SbomResolver } from './components/sbom/SbomResolver';
+import { PortScanner } from './components/portScanner/PortScanner';
 import {
   SonarProject,
   SonarIssue,
@@ -25,6 +28,23 @@ export const App: React.FC = () => {
     return (localStorage.getItem('devsecops_active_tool') as ActiveTool) || 'sonar';
   });
 
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('devsecops_sidebar_collapsed') === 'true';
+  });
+
+  const handleSelectTool = (tool: ActiveTool) => {
+    setActiveTool(tool);
+    localStorage.setItem('devsecops_active_tool', tool);
+  };
+
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('devsecops_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
+
   // SonarQube state
   const [serverUrl, setServerUrl] = useState('https://sonarcloud.io');
   const [project, setProject] = useState<SonarProject | null>(null);
@@ -41,7 +61,7 @@ export const App: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<QualityCategory | undefined>(undefined);
   const [selectedSeverity, setSelectedSeverity] = useState<SonarSeverity | undefined>(undefined);
 
-  // Subdomain count helper for tab indicator
+  // Subdomain count helper for sidebar badge
   const [subdomainCount, setSubdomainCount] = useState<number>(0);
 
   // Track subdomain count changes in localStorage
@@ -59,6 +79,8 @@ export const App: React.FC = () => {
         setSubdomainCount(0);
       }
     };
+
+    handleStorageChange();
     window.addEventListener('storage', handleStorageChange);
     const interval = setInterval(handleStorageChange, 2000);
     return () => {
@@ -66,11 +88,6 @@ export const App: React.FC = () => {
       clearInterval(interval);
     };
   }, []);
-
-  const handleSelectTool = (tool: ActiveTool) => {
-    setActiveTool(tool);
-    localStorage.setItem('devsecops_active_tool', tool);
-  };
 
   // Sonar - Test Connection (Only checks if project exists; does NOT load project card or table)
   const handleTestConnection = async (config: SonarConnectionConfig) => {
@@ -143,16 +160,11 @@ export const App: React.FC = () => {
     setIsExporting(true);
     try {
       await exportSonarIssuesToExcel(project, issues, serverUrl, options);
-      setAlert({
-        type: 'success',
-        title: 'Export Complete',
-        message: 'Excel spreadsheet generated and downloaded.',
-      });
     } catch (err: any) {
       setAlert({
         type: 'error',
-        title: 'Export Error',
-        message: err.message || 'Failed to generate Excel file.',
+        title: 'Export Failed',
+        message: err.message || 'Could not generate Excel export.',
       });
     } finally {
       setIsExporting(false);
@@ -204,90 +216,111 @@ export const App: React.FC = () => {
   }, [issues, selectedCategory, selectedSeverity, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-zinc-800 selection:text-white">
-      {/* Minimal Header */}
-      <Header
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-row font-sans selection:bg-zinc-800 selection:text-white">
+      {/* Collapsible Left Sidebar */}
+      <Sidebar
         activeTool={activeTool}
         onSelectTool={handleSelectTool}
         sonarIssuesCount={issues.length}
         subdomainCount={subdomainCount}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={handleToggleSidebar}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-[1720px] w-full mx-auto px-6 sm:px-8 lg:px-10 py-6 space-y-4">
-        {/* Status Toast / Alert */}
-        <AlertBanner alert={alert} onDismiss={() => setAlert(null)} />
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
+        {/* Top Header */}
+        <Header
+          activeTool={activeTool}
+          sonarIssuesCount={issues.length}
+          subdomainCount={subdomainCount}
+        />
 
-        {/* Tab 1: SonarQube Excel Exporter */}
-        {activeTool === 'sonar' && (
-          <div className="space-y-4">
-            <ConnectionForm
-              onFetch={handleFetchIssues}
-              onTestConnection={handleTestConnection}
-              onReset={handleReset}
-              isLoading={isLoading}
-              isTesting={isTesting}
-              progress={progress}
-              hasData={hasFetched}
-            />
+        {/* Dynamic Tool Content */}
+        <main className="flex-1 p-6 lg:p-8 max-w-[1720px] w-full mx-auto space-y-4">
+          {/* Status Toast / Alert */}
+          <AlertBanner alert={alert} onDismiss={() => setAlert(null)} />
 
-            {/* Loaded Project & Issues Section - ONLY shown when Fetch Issues succeeds */}
-            {hasFetched && project && (
-              <div className="space-y-4 pt-1">
-                {/* Project Header Bar */}
-                <ProjectCard project={project} serverUrl={serverUrl} />
+          {/* Tab 1: SonarQube Excel Exporter */}
+          {activeTool === 'sonar' && (
+            <div className="space-y-4">
+              <ConnectionForm
+                onFetch={handleFetchIssues}
+                onTestConnection={handleTestConnection}
+                onReset={handleReset}
+                isLoading={isLoading}
+                isTesting={isTesting}
+                progress={progress}
+                hasData={hasFetched}
+              />
 
-                {/* Export Toolbar */}
-                <ExportModal
-                  issues={issues}
-                  onExport={handleExport}
-                  isExporting={isExporting}
-                />
+              {/* Loaded Project & Issues Section - ONLY shown when Fetch Issues succeeds */}
+              {hasFetched && project && (
+                <div className="space-y-4 pt-1">
+                  {/* Project Header Bar */}
+                  <ProjectCard project={project} serverUrl={serverUrl} />
 
-                {/* Metrics Breakdown */}
-                <MetricsOverview
-                  issues={issues}
-                  onSelectFilter={handleSelectFilter}
-                  activeCategory={selectedCategory}
-                  activeSeverity={selectedSeverity}
-                />
+                  {/* Export Toolbar */}
+                  <ExportModal
+                    issues={issues}
+                    onExport={handleExport}
+                    isExporting={isExporting}
+                  />
 
-                {/* Issues Filters Toolbar */}
-                <IssueFilters
-                  searchQuery={searchQuery}
-                  onSearchChange={setSearchQuery}
-                  selectedCategory={selectedCategory}
-                  onCategoryChange={setSelectedCategory}
-                  selectedSeverity={selectedSeverity}
-                  onSeverityChange={setSelectedSeverity}
-                  totalIssues={new Set(issues.map((i) => i.key)).size}
-                  filteredCount={new Set(filteredIssues.map((i) => i.key)).size}
-                  onClearFilters={() => {
-                    setSelectedCategory(undefined);
-                    setSelectedSeverity(undefined);
-                    setSearchQuery('');
-                  }}
-                />
+                  {/* Metrics Breakdown */}
+                  <MetricsOverview
+                    issues={issues}
+                    onSelectFilter={handleSelectFilter}
+                    activeCategory={selectedCategory}
+                    activeSeverity={selectedSeverity}
+                  />
 
-                {/* Issues Table */}
-                <IssueTable issues={filteredIssues} />
-              </div>
-            )}
-          </div>
-        )}
+                  {/* Issues Filters Toolbar */}
+                  <IssueFilters
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    selectedCategory={selectedCategory}
+                    onCategoryChange={setSelectedCategory}
+                    selectedSeverity={selectedSeverity}
+                    onSeverityChange={setSelectedSeverity}
+                    totalIssues={new Set(issues.map((i) => i.key)).size}
+                    filteredCount={new Set(filteredIssues.map((i) => i.key)).size}
+                    onClearFilters={() => {
+                      setSelectedCategory(undefined);
+                      setSelectedSeverity(undefined);
+                      setSearchQuery('');
+                    }}
+                  />
 
-        {/* Tab 2: Subdomain MasterSheet */}
-        {activeTool === 'subdomain' && (
-          <div>
-            <SubdomainScanner />
-          </div>
-        )}
-      </main>
+                  {/* Issues Table */}
+                  <IssueTable issues={filteredIssues} />
+                </div>
+              )}
+            </div>
+          )}
 
-      {/* Minimal Footer */}
-      <footer className="border-t border-zinc-900 py-4 text-center text-xs text-zinc-600">
-        <span>{activeTool === 'sonar' ? 'SonarQube Excel Exporter' : 'Subdomain MasterSheet'}</span>
-      </footer>
+          {/* Tab 2: Subdomain MasterSheet */}
+          {activeTool === 'subdomain' && (
+            <div>
+              <SubdomainScanner />
+            </div>
+          )}
+
+          {/* Tab 3: SBOM License Resolver */}
+          {activeTool === 'sbom' && (
+            <div>
+              <SbomResolver />
+            </div>
+          )}
+
+          {/* Tab 4: Port & Service Scanner */}
+          {activeTool === 'ports' && (
+            <div>
+              <PortScanner />
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 };

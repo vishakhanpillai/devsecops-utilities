@@ -1,5 +1,5 @@
 # Stage 1: Build Frontend (Vite) & Backend Bundle (esbuild)
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -18,15 +18,23 @@ COPY backend/ ./backend/
 # Build both frontend (frontend/dist) and backend bundle (backend/dist/index.js)
 RUN npm run build
 
-# Stage 2: Ultra-Lean Production Runtime (~70 MB)
-# Contains ONLY compiled assets and minimal runtime dependencies
-
-FROM node:20-alpine AS runner
+# Stage 2: Production Runtime with Debian/Ubuntu glibc & Full Nmap Suite
+# Solves Alpine musl libc quirks, parallel DNS issues, and missing NSE probes
+FROM node:20-bookworm-slim AS runner
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
+
+# Install full glibc Nmap, CA certificates, and libcap2-bin for unprivileged raw socket support
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nmap \
+    ca-certificates \
+    libcap2-bin \
+    && setcap cap_net_raw,cap_net_admin+eip /usr/bin/nmap \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy only the backend's package manifest to isolate runtime dependencies
 # This excludes dev tools (TypeScript, Vite, Tailwind, Rollup, PostCSS, tsx)

@@ -11,6 +11,10 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+    # Enable low-level packet crafting & scanning capabilities without requiring full --privileged mode
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
     healthcheck:
       test:
         [

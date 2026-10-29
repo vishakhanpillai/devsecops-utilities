@@ -6,6 +6,8 @@ import { fileURLToPath } from 'url';
 import type { Server } from 'http';
 import { sonarRouter } from './routes/sonar.routes';
 import { subdomainRouter } from './routes/subdomain.routes';
+import { sbomRouter } from './routes/sbom.routes';
+import { portScannerRouter } from './routes/portScanner.routes';
 
 // Allow internal / self-signed SSL certificates commonly used in on-premise SonarQube servers
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -33,6 +35,8 @@ app.get('/api/health', (_req, res) => {
 // Mount Routes
 app.use('/api', sonarRouter);
 app.use('/api', subdomainRouter);
+app.use('/api/sbom', sbomRouter);
+app.use('/api/scan/ports', portScannerRouter);
 
 // Determine static frontend build path (supports Docker public folder, local dev, or configured path)
 const candidateDistPaths = [
